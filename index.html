@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LILA BLACK — Player Journey Visualizer</title>
+  <style>
+    :root {
+      --bg: #0b0d14;
+      --surface: #13161f;
+      --surface2: #1a1e2e;
+      --border: #252a3d;
+      --accent: #4f8ef7;
+      --text: #e2e8f0;
+      --text-muted: #64748b;
+      --kill: #ef4444;
+      --death: #f97316;
+      --loot: #22c55e;
+      --storm: #a855f7;
+      --human: #3b82f6;
+      --bot: #6b7280;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, 'Inter', sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      font-size: 13px;
+    }
+
+    /* HEADER */
+    header {
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      height: 50px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      gap: 14px;
+    }
+    .header-logo { display: flex; align-items: center; gap: 10px; }
+    .logo-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
+    }
+    header h1 { font-size: 15px; font-weight: 700; letter-spacing: 0.06em; color: var(--accent); }
+    header .sep { color: var(--border); }
+    header .subtitle { color: var(--text-muted); font-size: 12px; }
+    .header-stats {
+      margin-left: auto;
+      display: flex;
+      gap: 22px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .header-stats b { color: var(--text); font-weight: 600; }
+
+    /* LAYOUT */
+    .main { display: flex; flex: 1; overflow: hidden; }
+
+    /* SIDEBAR */
+    .sidebar {
+      width: 255px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow-y: auto;
+    }
+    .section {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section h3 {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 9px;
+    }
+    .field-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+    select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 9px;
+      border-radius: 6px;
+      font-size: 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      outline: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 9px center;
+      padding-right: 28px;
+    }
+    select:focus { border-color: var(--accent); }
+    select option { background: #1a1e2e; }
+
+    .match-count { font-size: 11px; color: var(--text-muted); margin-bottom: 5px; }
+
+    /* TOGGLE BUTTONS */
+    .btn-row { display: flex; gap: 5px; flex-wrap: wrap; }
+    .tog {
+      padding: 5px 10px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 500;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .tog.on { border-color: var(--accent); color: var(--accent); background: rgba(79,142,247,0.12); }
+    .tog.on.kill  { border-color: var(--kill);  color: var(--kill);  background: rgba(239,68,68,0.1); }
+    .tog.on.death { border-color: var(--death); color: var(--death); background: rgba(249,115,22,0.1); }
+    .tog.on.loot  { border-color: var(--loot);  color: var(--loot);  background: rgba(34,197,94,0.1); }
+    .tog.on.storm { border-color: var(--storm); color: var(--storm); background: rgba(168,85,247,0.1); }
+
+    /* HEATMAP GRID */
+    .heat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+    .heat-btn {
+      padding: 6px 6px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 500;
+      text-align: center;
+      transition: all 0.15s;
+    }
+    .heat-btn.on { border-color: #f59e0b; color: #f59e0b; background: rgba(245,158,11,0.12); }
+    .heat-btn.clear { grid-column: 1/-1; margin-top: 2px; }
+
+    /* LEGEND */
+    .leg { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; font-size: 11px; color: var(--text-muted); }
+    .leg-line { width: 20px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+    .leg-dot  { width: 9px;  height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .leg-sub  { font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--border); margin: 8px 0 5px; }
+
+    /* CANVAS AREA */
+    .canvas-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #07090f;
+      overflow: hidden;
+    }
+    .canvas-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+      position: relative;
+      overflow: hidden;
+    }
+    canvas {
+      border-radius: 8px;
+      box-shadow: 0 0 50px rgba(0,0,0,0.9);
+      display: block;
+    }
+
+    /* OVERLAYS */
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      border-radius: 8px;
+      pointer-events: none;
+    }
+    .overlay.loading { background: rgba(11,13,20,0.88); pointer-events: all; }
+    .overlay.empty   { }
+    .overlay.hidden  { display: none; }
+    .spinner {
+      width: 34px; height: 34px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .overlay-text { font-size: 13px; color: var(--text-muted); }
+    .empty-icon { font-size: 38px; opacity: 0.2; }
+
+    /* TIMELINE */
+    .timeline {
+      height: 70px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 9px 16px 9px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      flex-shrink: 0;
+    }
+    .match-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 11px;
+      color: var(--text-muted);
+      height: 18px;
+    }
+    .badge {
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .badge-h { background: rgba(59,130,246,0.2); color: #60a5fa; }
+    .badge-b { background: rgba(107,114,128,0.2); color: #9ca3af; }
+
+    .tl-row { display: flex; align-items: center; gap: 9px; }
+    .play-btn {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: none;
+      color: #fff;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .play-btn:hover { background: #3b7de8; }
+    .play-btn:disabled { background: var(--surface2); color: var(--text-muted); cursor: not-allowed; }
+    .rst-btn {
+      width: 24px; height: 24px;
+      border-radius: 4px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 11px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .rst-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    input[type=range] {
+      flex: 1;
+      accent-color: var(--accent);
+      cursor: pointer;
+      height: 4px;
+    }
+    input[type=range]:disabled { opacity: 0.3; cursor: not-allowed; }
+    .time-lbl {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+      min-width: 96px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="header-logo">
+    <div class="logo-dot"></div>
+    <h1>LILA BLACK</h1>
+    <span class="sep">|</span>
+    <span class="subtitle">Player Journey Visualizer</span>
+  </div>
+  <div class="header-stats">
+    <div>Matches <b id="sMatches">—</b></div>
+    <div>Human Players <b id="sPlayers">—</b></div>
+    <div>Total Events <b id="sEvents">—</b></div>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- FILTERS -->
+    <div class="section">
+      <h3>Filters</h3>
+      <div class="field-label">Map</div>
+      <select id="selMap">
+        <option value="AmbroseValley">🏜 Ambrose Valley</option>
+        <option value="GrandRift">🌿 Grand Rift</option>
+        <option value="Lockdown">🏙 Lockdown</option>
+      </select>
+      <div class="field-label">Day</div>
+      <select id="selDay">
+        <option value="all">All Days (Feb 10–14)</option>
+        <option value="February_10">February 10</option>
+        <option value="February_11">February 11</option>
+        <option value="February_12">February 12</option>
+        <option value="February_13">February 13</option>
+        <option value="February_14">February 14</option>
+      </select>
+      <div class="field-label">Match</div>
+      <div class="match-count" id="matchCount">Loading...</div>
+      <select id="selMatch"></select>
+    </div>
+
+    <!-- PLAYERS -->
+    <div class="section">
+      <h3>Show Players</h3>
+      <div class="btn-row">
+        <button class="tog on" id="togH" onclick="toggleLayer('h')">👤 Humans</button>
+        <button class="tog on" id="togB" onclick="toggleLayer('b')">🤖 Bots</button>
+      </div>
+    </div>
+
+    <!-- EVENT MARKERS -->
+    <div class="section">
+      <h3>Event Markers</h3>
+      <div class="btn-row">
+        <button class="tog on kill"  data-ev="Kill"  onclick="toggleEv(this)">⚔ Kills</button>
+        <button class="tog on death" data-ev="Death" onclick="toggleEv(this)">💀 Deaths</button>
+        <button class="tog on loot"  data-ev="Loot"  onclick="toggleEv(this)">📦 Loot</button>
+        <button class="tog on storm" data-ev="Storm" onclick="toggleEv(this)">🌪 Storm</button>
+      </div>
+    </div>
+
+    <!-- HEATMAPS -->
+    <div class="section">
+      <h3>Heatmap Overlay</h3>
+      <div class="heat-grid">
+        <button class="heat-btn" data-ht="traffic" onclick="setHeat(this,'traffic')">🔥 Traffic</button>
+        <button class="heat-btn" data-ht="kills"   onclick="setHeat(this,'kills')">⚔ Kill Zones</button>
+        <button class="heat-btn" data-ht="deaths"  onclick="setHeat(this,'deaths')">💀 Death Zones</button>
+        <button class="heat-btn" data-ht="loot"    onclick="setHeat(this,'loot')">📦 Loot Zones</button>
+        <button class="heat-btn clear"              onclick="clearHeat()">✕ Clear Heatmap</button>
+      </div>
+    </div>
+
+    <!-- LEGEND -->
+    <div class="section">
+      <h3>Legend</h3>
+      <div class="leg-sub">Paths</div>
+      <div class="leg"><div class="leg-line" style="background:#3b82f6"></div>Human path</div>
+      <div class="leg"><div class="leg-line" style="background:#4b5563"></div>Bot path</div>
+      <div class="leg-sub">Events</div>
+      <div class="leg"><div class="leg-dot" style="background:#ef4444"></div>Kill / Bot Kill</div>
+      <div class="leg"><div class="leg-dot" style="background:#f97316"></div>Killed / Bot Killed</div>
+      <div class="leg"><div class="leg-dot" style="background:#22c55e"></div>Loot pickup</div>
+      <div class="leg"><div class="leg-dot" style="background:#a855f7"></div>Storm death</div>
+      <div class="leg-sub">Heatmap</div>
+      <div class="leg">
+        <div style="width:80px;height:8px;border-radius:4px;background:linear-gradient(to right,#0000ff,#00ffff,#00ff00,#ffff00,#ff0000)"></div>
+        Low → High density
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-area">
+    <div class="canvas-wrap" id="wrap">
+      <canvas id="c"></canvas>
+      <div class="overlay loading hidden" id="loadOverlay">
+        <div class="spinner"></div>
+        <div class="overlay-text" id="loadText">Loading...</div>
+      </div>
+      <div class="overlay empty" id="emptyOverlay">
+        <div class="empty-icon">🗺</div>
+        <div class="overlay-text">Select a match to view player journeys</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Or enable a heatmap overlay</div>
+      </div>
+    </div>
+
+    <!-- TIMELINE -->
+    <div class="timeline">
+      <div class="match-meta" id="matchMeta">
+        <span style="color:var(--text-muted)">No match selected</span>
+      </div>
+      <div class="tl-row">
+        <button class="rst-btn" id="btnRst" onclick="rstTime()" disabled title="Reset">⏮</button>
+        <button class="play-btn" id="btnPlay" onclick="togglePlay()" disabled>▶</button>
+        <input type="range" id="slider" min="0" max="100" value="0" disabled oninput="onSlide(this.value)">
+        <div class="time-lbl" id="timeLbl">00:00 / 00:00</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────────────
+const S = {
+  idx: [],           // matches.json
+  heat: null,        // heatmaps.json
+  match: null,       // current match data
+  map: 'AmbroseValley',
+  day: 'all',
+  selMatch: null,
+  heatType: 'none',
+  showH: true,
+  showB: true,
+  evOn: { Kill: true, Death: true, Loot: true, Storm: true },
+  t: 0,
+  tMax: 0,
+  playing: false,
+  playTick: null,
+  imgs: {},
+  cs: 700
+};
+
+const MAPS = {
+  AmbroseValley: 'minimaps/AmbroseValley_Minimap.png',
+  GrandRift:     'minimaps/GrandRift_Minimap.png',
+  Lockdown:      'minimaps/Lockdown_Minimap.jpg'
+};
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+async function init() {
+  resize(); window.addEventListener('resize', () => { resize(); render(); });
+
+  // Preload minimaps
+  await Promise.all(Object.entries(MAPS).map(([id, src]) =>
+    new Promise(res => {
+      const img = new Image();
+      img.onload = () => { S.imgs[id] = img; res(); };
+      img.onerror = res;
+      img.src = src;
+    })
+  ));
+
+  // Load match index
+  showLoad('Loading match index...');
+  try {
+    const r = await fetch('data/matches.json');
+    S.idx = await r.json();
+    setHeaderStats();
+    buildMatchList();
+  } catch(e) { console.error('matches.json load failed', e); }
+
+  // Load heatmaps
+  try {
+    const r = await fetch('data/heatmaps.json');
+    S.heat = await r.json();
+  } catch(e) { console.error('heatmaps.json load failed', e); }
+
+  hideLoad(); render();
+
+  // Listeners
+  document.getElementById('selMap').onchange = e => {
+    S.map = e.target.value;
+    S.selMatch = null;
+    S.match = null;
+    buildMatchList();
+    resetTimeline();
+    render();
+  };
+  document.getElementById('selDay').onchange = e => {
+    S.day = e.target.value;
+    S.selMatch = null;
+    S.match = null;
+    buildMatchList();
+    resetTimeline();
+    render();
+  };
+  document.getElementById('selMatch').onchange = e => {
+    const v = e.target.value;
+    if (v) loadMatch(v); else { S.match = null; S.selMatch = null; resetTimeline(); render(); }
+  };
+}
+
+// ─── CANVAS ───────────────────────────────────────────────────────────────────
+function resize() {
+  const w = document.getElementById('wrap');
+  const sz = Math.max(380, Math.min(w.clientWidth - 28, w.clientHeight - 28));
+  S.cs = sz;
+  canvas.width = canvas.height = sz;
+}
+
+function toCanvas(px, py) {
+  const sc = S.cs / 1024;
+  return [px * sc, py * sc];
+}
+
+// ─── LOAD MATCH ───────────────────────────────────────────────────────────────
+async function loadMatch(matchId) {
+  showLoad('Loading match data...');
+  S.selMatch = matchId;
+  S.match = null;
+  try {
+    const r = await fetch(`data/matches/${matchId}.json`);
+    S.match = await r.json();
+
+    // Compute max time
+    let mx = 0;
+    for (const p of S.match.players) {
+      for (const [,,ts] of p.path) mx = Math.max(mx, ts);
+      for (const ev of p.events) mx = Math.max(mx, ev.ts);
+    }
+    S.tMax = mx;
+    S.t = mx;
+
+    const sl = document.getElementById('slider');
+    sl.max = mx; sl.value = mx; sl.disabled = false;
+    document.getElementById('btnPlay').disabled = false;
+    document.getElementById('btnRst').disabled = false;
+
+    updateTimeLbl();
+    updateMatchMeta();
+  } catch(e) { console.error('match load failed', e); }
+  hideLoad(); render();
+}
+
+// ─── BUILD UI ─────────────────────────────────────────────────────────────────
+function buildMatchList() {
+  const filtered = S.idx.filter(m =>
+    m.map_id === S.map && (S.day === 'all' || m.day === S.day)
+  );
+  document.getElementById('matchCount').textContent =
+    `${filtered.length} match${filtered.length !== 1 ? 'es' : ''} found`;
+
+  const sel = document.getElementById('selMatch');
+  sel.innerHTML = '<option value="">— Select a match —</option>';
+  filtered.forEach(m => {
+    const o = document.createElement('option');
+    o.value = m.match_id;
+    const d = m.day.replace('February_', 'Feb ');
+    o.textContent = `${d}  •  ${m.humans}H + ${m.bots}B  •  ${fmtTime(m.duration_ms)}`;
+    sel.appendChild(o);
+  });
+}
+
+function setHeaderStats() {
+  const totalH = S.idx.reduce((a, m) => a + m.humans, 0);
+  const totalEv = S.idx.reduce((a, m) => a + m.total_events, 0);
+  document.getElementById('sMatches').textContent = S.idx.length.toLocaleString();
+  document.getElementById('sPlayers').textContent = totalH.toLocaleString();
+  document.getElementById('sEvents').textContent = (Math.round(totalEv / 1000)) + 'k';
+}
+
+function updateMatchMeta() {
+  if (!S.match || !S.selMatch) {
+    document.getElementById('matchMeta').innerHTML =
+      '<span style="color:var(--text-muted)">No match selected</span>';
+    return;
+  }
+  const meta = S.idx.find(m => m.match_id === S.selMatch) || {};
+  const humans = S.match.players.filter(p => !p.is_bot).length;
+  const bots   = S.match.players.filter(p =>  p.is_bot).length;
+  const day = (meta.day || '').replace('February_', 'Feb ');
+  document.getElementById('matchMeta').innerHTML = `
+    <span>${day}</span>
+    <span style="font-size:10px;color:#4f8ef7;font-family:monospace">${S.selMatch.slice(0,8)}…</span>
+    <span class="badge badge-h">👤 ${humans} humans</span>
+    <span class="badge badge-b">🤖 ${bots} bots</span>
+    <span>Duration: ${fmtTime(S.tMax)}</span>
+  `;
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function render() {
+  const cs = S.cs;
+  ctx.clearRect(0, 0, cs, cs);
+
+  // Minimap background
+  const img = S.imgs[S.map];
+  if (img) {
+    ctx.drawImage(img, 0, 0, cs, cs);
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.fillRect(0, 0, cs, cs);
+  } else {
+    ctx.fillStyle = '#1a1e2e';
+    ctx.fillRect(0, 0, cs, cs);
+  }
+
+  // Heatmap
+  if (S.heatType !== 'none' && S.heat) {
+    const mh = S.heat[S.map];
+    if (mh && mh[S.heatType]) drawHeatmap(mh[S.heatType]);
+  }
+
+  // Match data
+  const hasMatch = !!(S.match);
+  document.getElementById('emptyOverlay').classList.toggle(
+    'hidden', hasMatch || S.heatType !== 'none'
+  );
+
+  if (S.match) {
+    for (const p of S.match.players) {
+      if (p.is_bot && !S.showB) continue;
+      if (!p.is_bot && !S.showH) continue;
+      drawPath(p);
+      drawEvents(p);
+    }
+  }
+}
+
+function drawPath(p) {
+  const pts = p.path.filter(([,,ts]) => ts <= S.t);
+  if (pts.length < 2) return;
+
+  const isBot = p.is_bot;
+  ctx.beginPath();
+  ctx.strokeStyle = isBot ? 'rgba(107,114,128,0.45)' : 'rgba(59,130,246,0.8)';
+  ctx.lineWidth = isBot ? 1 : 1.5;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+
+  let first = true;
+  for (const [px, py] of pts) {
+    const [cx, cy] = toCanvas(px, py);
+    if (first) { ctx.moveTo(cx, cy); first = false; }
+    else ctx.lineTo(cx, cy);
+  }
+  ctx.stroke();
+
+  // Start dot
+  const [sx, sy] = toCanvas(pts[0][0], pts[0][1]);
+  dot(sx, sy, isBot ? 2 : 3, isBot ? '#6b7280' : '#3b82f6');
+
+  // Current position
+  const last = pts[pts.length - 1];
+  const [lx, ly] = toCanvas(last[0], last[1]);
+  dot(lx, ly, isBot ? 3 : 4.5, isBot ? '#9ca3af' : '#93c5fd');
+  if (!isBot) {
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(147,197,253,0.35)';
+    ctx.lineWidth = 1;
+    ctx.arc(lx, ly, 8, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+function drawEvents(p) {
+  for (const ev of p.events) {
+    if (ev.ts > S.t) continue;
+    let color = null;
+    const t = ev.type;
+    if ((t === 'Kill' || t === 'BotKill')        && S.evOn.Kill)  color = '#ef4444';
+    if ((t === 'Killed' || t === 'BotKilled')    && S.evOn.Death) color = '#f97316';
+    if (t === 'Loot'                              && S.evOn.Loot)  color = '#22c55e';
+    if (t === 'KilledByStorm'                    && S.evOn.Storm) color = '#a855f7';
+    if (!color) continue;
+
+    const [cx, cy] = toCanvas(ev.px, ev.py);
+    // Glow ring
+    ctx.beginPath();
+    ctx.fillStyle = color + '30';
+    ctx.arc(cx, cy, 9, 0, Math.PI * 2);
+    ctx.fill();
+    // Dot
+    dot(cx, cy, 4.5, color);
+    // White center
+    dot(cx, cy, 1.5, 'rgba(255,255,255,0.85)');
+  }
+}
+
+function dot(x, y, r, color) {
+  ctx.beginPath();
+  ctx.fillStyle = color;
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// ─── HEATMAP ──────────────────────────────────────────────────────────────────
+function drawHeatmap(pts) {
+  if (!pts || !pts.length) return;
+  const cs = S.cs;
+  const G = 100;
+  const cell = cs / G;
+  const grid = new Float32Array(G * G);
+  const rad = 4;
+
+  for (const [px, py] of pts) {
+    const gx = Math.floor((px / 1024) * G);
+    const gy = Math.floor((py / 1024) * G);
+    for (let dy = -rad; dy <= rad; dy++) {
+      for (let dx = -rad; dx <= rad; dx++) {
+        const nx = Math.max(0, Math.min(G-1, gx+dx));
+        const ny = Math.max(0, Math.min(G-1, gy+dy));
+        const d = Math.sqrt(dx*dx + dy*dy);
+        if (d <= rad) grid[ny*G+nx] += (1 - d/rad) ** 2;
+      }
+    }
+  }
+
+  let mx = 0;
+  for (let i = 0; i < grid.length; i++) if (grid[i] > mx) mx = grid[i];
+  if (!mx) return;
+
+  for (let gy = 0; gy < G; gy++) {
+    for (let gx = 0; gx < G; gx++) {
+      const v = grid[gy*G+gx] / mx;
+      if (v < 0.04) continue;
+      const [r,g,b] = heatCol(v);
+      ctx.fillStyle = `rgba(${r},${g},${b},${Math.min(0.88, v * 0.92)})`;
+      ctx.fillRect(gx*cell, gy*cell, cell+0.5, cell+0.5);
+    }
+  }
+}
+
+function heatCol(t) {
+  if (t < 0.25) return [0, Math.round(t*4*255), 255];
+  if (t < 0.5)  return [0, 255, Math.round((1-(t-0.25)*4)*255)];
+  if (t < 0.75) return [Math.round((t-0.5)*4*255), 255, 0];
+  return [255, Math.round((1-(t-0.75)*4)*255), 0];
+}
+
+// ─── TIMELINE ─────────────────────────────────────────────────────────────────
+function togglePlay() {
+  if (!S.match) return;
+  S.playing = !S.playing;
+  document.getElementById('btnPlay').textContent = S.playing ? '⏸' : '▶';
+  if (S.playing) {
+    if (S.t >= S.tMax) S.t = 0;
+    const step = Math.max(1, Math.ceil(S.tMax / 200));
+    S.playTick = setInterval(() => {
+      S.t = Math.min(S.tMax, S.t + step);
+      document.getElementById('slider').value = S.t;
+      updateTimeLbl();
+      render();
+      if (S.t >= S.tMax) {
+        S.playing = false;
+        document.getElementById('btnPlay').textContent = '▶';
+        clearInterval(S.playTick);
+      }
+    }, 50);
+  } else {
+    clearInterval(S.playTick);
+  }
+}
+
+function rstTime() {
+  S.playing = false; clearInterval(S.playTick);
+  document.getElementById('btnPlay').textContent = '▶';
+  S.t = S.tMax;
+  document.getElementById('slider').value = S.tMax;
+  updateTimeLbl(); render();
+}
+
+function resetTimeline() {
+  S.t = 0; S.tMax = 0; S.playing = false; clearInterval(S.playTick);
+  document.getElementById('btnPlay').textContent = '▶';
+  document.getElementById('btnPlay').disabled = true;
+  document.getElementById('btnRst').disabled = true;
+  const sl = document.getElementById('slider');
+  sl.disabled = true; sl.value = 0; sl.max = 100;
+  document.getElementById('timeLbl').textContent = '00:00 / 00:00';
+  document.getElementById('matchMeta').innerHTML =
+    '<span style="color:var(--text-muted)">No match selected</span>';
+}
+
+function onSlide(v) {
+  S.t = parseInt(v);
+  updateTimeLbl();
+  render();
+}
+
+function updateTimeLbl() {
+  const pct = S.tMax > 0 ? Math.round((S.t / S.tMax) * 100) : 0;
+  document.getElementById('timeLbl').textContent = `${pct}% / 100%`;
+}
+
+function fmtTime(ms) {
+  const s = Math.floor(ms / 1000);
+  return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+}
+
+// ─── TOGGLE HELPERS ───────────────────────────────────────────────────────────
+function toggleLayer(l) {
+  if (l === 'h') {
+    S.showH = !S.showH;
+    document.getElementById('togH').classList.toggle('on', S.showH);
+  } else {
+    S.showB = !S.showB;
+    document.getElementById('togB').classList.toggle('on', S.showB);
+  }
+  render();
+}
+
+function toggleEv(btn) {
+  const k = btn.dataset.ev;
+  S.evOn[k] = !S.evOn[k];
+  btn.classList.toggle('on', S.evOn[k]);
+  render();
+}
+
+function setHeat(btn, type) {
+  S.heatType = type;
+  document.querySelectorAll('.heat-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  render();
+}
+
+function clearHeat() {
+  S.heatType = 'none';
+  document.querySelectorAll('.heat-btn').forEach(b => b.classList.remove('on'));
+  render();
+}
+
+// ─── LOADING ──────────────────────────────────────────────────────────────────
+function showLoad(txt) {
+  document.getElementById('loadText').textContent = txt;
+  document.getElementById('loadOverlay').classList.remove('hidden');
+  document.getElementById('emptyOverlay').classList.add('hidden');
+}
+function hideLoad() {
+  document.getElementById('loadOverlay').classList.add('hidden');
+}
+
+// ─── GO ───────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
